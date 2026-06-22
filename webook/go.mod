@@ -2,7 +2,10 @@ module rewebook
 
 go 1.25.11
 
-require github.com/gin-gonic/gin v1.12.0
+require (
+	github.com/dlclark/regexp2 v1.12.0
+	github.com/gin-gonic/gin v1.12.0
+)
 
 require (
 	github.com/bytedance/gopkg v0.1.3 // indirect

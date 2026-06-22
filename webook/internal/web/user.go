@@ -4,12 +4,29 @@ import (
 	"fmt"
 	"net/http"
 
+	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	emailRegexPattern = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
+	// 和上面比起来，用 ` 看起来就比较清爽
+	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+)
+
 type UserHandler struct {
+	emailRexExp    *regexp.Regexp
+	passwordRexExp *regexp.Regexp
 }
 
+func NewUserHandler() *UserHandler {
+	emailExp := regexp.MustCompile(emailRegexPattern, regexp.None)
+	passwordExp := regexp.MustCompile(passwordRegexPattern, regexp.None)
+	return &UserHandler{
+		emailRexExp:    emailExp,
+		passwordRexExp: passwordExp,
+	}
+}
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//server.POST("/users/signup", u.SignUp)
 	//server.POST("/users/login", u.Login)
@@ -18,7 +35,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//server.Run(":8080")
 	ug := server.Group("/users")
 	ug.GET("/profile", u.Profile)
-	ug.POST("/sign", u.SignUp)
+	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.Login)
 	ug.POST("/edit", u.Edit)
 
@@ -26,12 +43,34 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 func (u *UserHandler) SignUp(ctx *gin.Context) {
 	type SignUpReq struct {
 		Email           string `json:"email"`
-		ConfirmPassword string `json:"confirm_Password"`
+		ConfirmPassword string `json:"confirmPassword"`
 		Password        string `json:"password"`
 	}
 	var req SignUpReq
 	//bind方法会根据Content-Type解析数据进req中 解析错误会直接协会一个400的错误
 	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	ok, err := u.emailRexExp.MatchString(req.Email)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, "你的邮箱格式不对")
+		return
+	}
+	if req.ConfirmPassword != req.Password {
+		ctx.String(http.StatusOK, "两次输入的密码不一致")
+		return
+	}
+	ok, err = u.passwordRexExp.MatchString(req.Password)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, "密码必须大于8位，包含数字、特殊字符")
 		return
 	}
 	ctx.String(http.StatusOK, "注册成功")
