@@ -41,6 +41,8 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 
 }
 
+//test
+
 // alg
 func (u *UserHandler) SignUp(ctx *gin.Context) {
 	type SignUpReq struct {
