@@ -1,15 +1,31 @@
 package main
 
 import (
+	"rewebook/internal/repository"
+	"rewebook/internal/repository/dao"
+	"rewebook/internal/service"
 	"rewebook/internal/web"
+	"rewebook/internal/web/middleware"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func main() {
+	db := initDB()
+	server := initWebServer()
+	u := initUser(db)
+	u.RegisterRoutes(server)
+	server.Run(":8080")
+}
+
+func initWebServer() *gin.Engine {
 	server := gin.Default()
 
 	//// CORS 中间件 —— 处理跨域 OPTIONS 预检请求
@@ -41,7 +57,28 @@ func main() {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
-	u := web.NewUserHandler()
-	u.RegisterRoutes(server)
-	server.Run(":8080")
+	store := cookie.NewStore([]byte("secret"))
+	server.Use(sessions.Sessions("mysession", store))
+	server.Use(middleware.NewLoginMiddlewareBuilder().Build())
+	return server
+}
+
+func initUser(db *gorm.DB) *web.UserHandler {
+	ud := dao.NewUserDAO(db)
+	repo := repository.NewUserRepository(ud)
+	svc := service.NewUserService(repo)
+	u := web.NewUserHandler(svc)
+	return u
+}
+func initDB() *gorm.DB {
+	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/webook"))
+	if err != nil {
+		//我只会在初始化过程中panic
+		panic(err)
+	}
+	err = dao.InitTable(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }
