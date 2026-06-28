@@ -42,12 +42,13 @@ func initWebServer() *gin.Engine {
 	//	c.Next()
 	//})
 	server.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"https://localhost:3000"},
-		AllowMethods: []string{"POST"},
-		AllowHeaders: []string{"Content-Type", "authorization"},
-		//ExposeHeaders:    []string{"Content-Type", "authorization"},
+		AllowOrigins:  []string{"https://localhost:3000"},
+		AllowMethods:  []string{"POST"},
+		AllowHeaders:  []string{"Content-Type", "authorization"},
+		ExposeHeaders: []string{"x-jwt-token"},
 		//是否允许你带cokkie等
 		AllowCredentials: true,
+
 		AllowOriginFunc: func(origin string) bool {
 			if strings.Contains(origin, "http://localhost") {
 				//开发环境
@@ -69,7 +70,9 @@ func initWebServer() *gin.Engine {
 		panic(err)
 	}
 	server.Use(sessions.Sessions("mysession", store))
-	server.Use(middleware.NewLoginMiddlewareBuilder().IgnorePaths("/users/").Build())
+	server.Use(middleware.NewLoginJWTMiddlewareBuilder().
+		IgnorePaths("/users/signup").
+		IgnorePaths("/users/login").Build())
 	return server
 }
 
