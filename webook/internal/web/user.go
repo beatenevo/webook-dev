@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"rewebook/internal/domain"
 	"rewebook/internal/service"
+	"time"
 
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
@@ -40,7 +41,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//server.GET("/users/profile", u.Profile)
 	//server.Run(":8080")
 	ug := server.Group("/users")
-	ug.GET("/profile", u.Profile)
+	ug.GET("/profile", u.ProfileJWT)
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
@@ -118,7 +119,14 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	token := jwt.New(jwt.SigningMethodHS512)
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+		Uid:       user.Id,
+		UserAgent: ctx.Request.UserAgent(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	tokenStr, err := token.SignedString([]byte("Zi13MDtrGO7gS8esBdaqFvlyxKRpfnHP"))
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, "系统错误")
@@ -172,5 +180,28 @@ func (u *UserHandler) Logout(ctx *gin.Context) {
 
 	ctx.String(http.StatusOK, "退出登录成功")
 }
-func (u *UserHandler) Edit(ctx *gin.Context)    {}
-func (u *UserHandler) Profile(ctx *gin.Context) {}
+func (u *UserHandler) Edit(ctx *gin.Context) {}
+func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
+	c, ok := ctx.Get("claims")
+	//你可以断定必然有claims
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	println(claims.Uid)
+	ctx.String(http.StatusOK, "这是你的Profile")
+}
+func (u *UserHandler) Profile(ctx *gin.Context) {
+	ctx.String(http.StatusOK, "这是你的Profile")
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid       int64
+	UserAgent string
+}

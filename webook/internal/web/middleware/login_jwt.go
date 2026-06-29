@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
+	"rewebook/internal/web"
 	"strings"
 	"time"
 
@@ -10,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// JWT登录校验
+// JWT login check.
 type LoginJWTMiddlewareBuilder struct {
 	path []string
 }
@@ -23,6 +25,7 @@ func (l *LoginJWTMiddlewareBuilder) IgnorePaths(path string) *LoginJWTMiddleware
 	l.path = append(l.path, path)
 	return l
 }
+
 func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		for _, path := range l.path {
@@ -30,11 +33,11 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 				return
 			}
 		}
-		//不需要登录校验
 		if ctx.Request.URL.Path == "/users/login" ||
 			ctx.Request.URL.Path == "/users/signup" {
 			return
 		}
+
 		sess := sessions.Default(ctx)
 		id := sess.Get("userId")
 		if id == nil {
@@ -43,26 +46,25 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 		}
 		updateTime := sess.Get("updataTime")
 		sess.Set("userId", id)
-		now := time.Now().UnixMilli()
+		nowMilli := time.Now().UnixMilli()
 		if updateTime == nil {
-			//没有刷新过
-			sess.Set("updataTime", now)
+			sess.Set("updataTime", nowMilli)
 			sess.Options(sessions.Options{
 				MaxAge: 3600,
 			})
 			sess.Save()
 			return
 		}
-		//updatretime有的
+
 		updateTimeVal, _ := updateTime.(int64)
-		if now-updateTimeVal > 10000 {
-			sess.Set("updataTime", now)
+		if nowMilli-updateTimeVal > 10000 {
+			sess.Set("updataTime", nowMilli)
 			sess.Save()
 			return
 		}
+
 		tokenHeader := ctx.GetHeader("Authorization")
 		if tokenHeader == "" {
-			//没登录
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
@@ -71,17 +73,34 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+
 		tokenStr := segs[1]
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		claims := &web.UserClaims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			return []byte("Zi13MDtrGO7gS8esBdaqFvlyxKRpfnHP"), nil
 		})
 		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		if token == nil || !token.Valid {
+		if token == nil || !token.Valid || claims.Uid == 0 {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+		if claims.UserAgent != ctx.Request.UserAgent() {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		now := time.Now()
+		if claims.ExpiresAt != nil && claims.ExpiresAt.Time.Sub(now) < time.Second*50 {
+			claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(time.Minute))
+			tokenStr, err = token.SignedString([]byte("Zi13MDtrGO7gS8esBdaqFvlyxKRpfnHP"))
+			if err != nil {
+				log.Println("jwt续约失败", err)
+			}
+			ctx.Header("x-jwt-token", tokenStr)
+		}
+
+		ctx.Set("claims", claims)
 	}
 }

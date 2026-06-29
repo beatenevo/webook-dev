@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"rewebook/internal/repository"
 	"rewebook/internal/repository/dao"
 	"rewebook/internal/service"
@@ -18,10 +19,14 @@ import (
 )
 
 func main() {
-	db := initDB()
-	server := initWebServer()
-	u := initUser(db)
-	u.RegisterRoutes(server)
+	//db := initDB()
+	//server := initWebServer()
+	//u := initUser(db)
+	//u.RegisterRoutes(server)
+	server := gin.Default()
+	server.GET("/hello", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "hello world")
+	})
 	server.Run(":8080")
 }
 

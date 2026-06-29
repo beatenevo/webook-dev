@@ -15,3 +15,13 @@ func TestPasswordEncrypt(t *testing.T) {
 	err = bcrypt.CompareHashAndPassword(encrypted, []byte("123456#hello"))
 	assert.NoError(t, err)
 }
+
+//func TestNil(t *testing.T) {
+//	c := nil
+//	claims := c.(*UserClaims)
+//	println(claims.Uid)
+//}
+//func testTypeAssert(c any) {
+//	claims := c.(*UserClaims)
+//	println(claims.Uid)
+//}
