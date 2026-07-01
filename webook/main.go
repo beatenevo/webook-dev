@@ -12,18 +12,20 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
+	ginredis "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func main() {
-	//db := initDB()
-	//server := initWebServer()
-	//u := initUser(db)
-	//u.RegisterRoutes(server)
-	server := gin.Default()
+	db := initDB()
+	redisClient := initRedis()
+	server := initWebServer()
+	u := initUser(db, redisClient)
+	u.RegisterRoutes(server)
+	//server := gin.Default()
 	server.GET("/hello", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "hello world")
 	})
@@ -46,6 +48,7 @@ func initWebServer() *gin.Engine {
 	//	}
 	//	c.Next()
 	//})
+
 	server.Use(cors.New(cors.Config{
 		AllowOrigins:  []string{"https://localhost:3000"},
 		AllowMethods:  []string{"POST"},
@@ -68,9 +71,10 @@ func initWebServer() *gin.Engine {
 	//	[]byte("zOMBnrxQ2u3bT7hlYtSg8jIyVk5PcRev"),
 	//	[]byte("Zi13MDtrGO7gS8esBdaqFvlyxKRpfnHP"),
 	//)
-	store, err := redis.NewStore(16,
-		"tcp", "localhost:6379", "", "",
-		[]byte("zOMBnrxQ2u3bT7hlYtSg8jIyVk5PcRev"), []byte("Zi13MDtrGO7gS8esBdaqFvlyxKRpfnHP"))
+	store, err := ginredis.NewStore(16,
+		"tcp", "webook-redis:11479", "", "",
+		[]byte("zOMBnrxQ2u3bT7hlYt"+
+			"Sg8jIyVk5PcRev"), []byte("Zi13MDtrGO7gS8esBdaqFvlyxKRpfnHP"))
 	if err != nil {
 		panic(err)
 	}
@@ -81,15 +85,20 @@ func initWebServer() *gin.Engine {
 	return server
 }
 
-func initUser(db *gorm.DB) *web.UserHandler {
+func initUser(db *gorm.DB, redisClient redis.Cmdable) *web.UserHandler {
 	ud := dao.NewUserDAO(db)
-	repo := repository.NewUserRepository(ud)
+	repo := repository.NewUserRepository(ud, redisClient)
 	svc := service.NewUserService(repo)
 	u := web.NewUserHandler(svc)
 	return u
 }
+func initRedis() redis.Cmdable {
+	return redis.NewClient(&redis.Options{
+		Addr: "webook-redis:11479",
+	})
+}
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/webook"))
+	db, err := gorm.Open(mysql.Open("root:root@tcp(webook-mysql:11309)/webook"))
 	if err != nil {
 		//我只会在初始化过程中panic
 		panic(err)

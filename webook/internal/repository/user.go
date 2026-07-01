@@ -4,6 +4,8 @@ import (
 	"context"
 	"rewebook/internal/domain"
 	"rewebook/internal/repository/dao"
+
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -12,11 +14,15 @@ var (
 )
 
 type UserRepository struct {
-	dao *dao.UserDAO
+	dao         *dao.UserDAO
+	redisClient redis.Cmdable
 }
 
-func NewUserRepository(dao *dao.UserDAO) *UserRepository {
-	return &UserRepository{dao: dao}
+func NewUserRepository(dao *dao.UserDAO, redisClient redis.Cmdable) *UserRepository {
+	return &UserRepository{
+		dao:         dao,
+		redisClient: redisClient,
+	}
 }
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
 	u, err := r.dao.FindByEmail(ctx, email)
